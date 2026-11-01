@@ -1,0 +1,16 @@
+# Copy next to the service's application.yml as application-local.yml (git-ignored) and run with
+#   SPRING_PROFILES_ACTIVE=local
+# Matches infra/docker-compose.yml. Passwords are NOT stored here: export them (see infra/samples/env.sample).
+
+# --- care-claims-service (8082) ---
+server:
+  address: 127.0.0.1
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/carent_claims
+    username: carent
+    password: ${SPRING_DATASOURCE_PASSWORD}      # value is in infra/docker-compose.yml; export it, never commit it
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      acks: all                                  # specs/04; 1 is acceptable for a throw-away demo

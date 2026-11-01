@@ -1,0 +1,33 @@
+server:
+  port: 8081
+  address: 127.0.0.1
+
+spring:
+  application:
+    name: care-auth-service
+
+# Secrets come from the environment only; there are deliberately no defaults (specs/07).
+#   JWT_SECRET               at least 32 characters
+#   AUTH_MEMBER_PASSWORD     password of demo user "member1"
+#   AUTH_ADJUDICATOR_PASSWORD, AUTH_ADMIN_PASSWORD likewise
+auth:
+  jwt:
+    secret: ${JWT_SECRET}
+    issuer: care-auth-service
+    ttl: 1h
+  users:
+    - username: member1
+      password: ${AUTH_MEMBER_PASSWORD}
+      roles: [ROLE_MEMBER]
+    - username: adjudicator1
+      password: ${AUTH_ADJUDICATOR_PASSWORD}
+      roles: [ROLE_CLAIMS_ADJUDICATOR, ROLE_MEMBER]
+    - username: admin1
+      password: ${AUTH_ADMIN_PASSWORD}
+      roles: [ROLE_ADMIN]
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,0 +1,29 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Secrets and local config - never commit
+.env
+.env.*
+*.pem
+*.key
+application-local.yml
+application-local.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bob local state
+.bob/tmp/
+
+# Generated local secrets (scripts/set-env.*)
+.env.local.ps1
+.env.local.sh

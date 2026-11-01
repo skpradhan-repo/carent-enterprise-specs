@@ -1,0 +1,37 @@
+server:
+  port: 8082
+  address: 127.0.0.1
+
+spring:
+  application:
+    name: care-claims-service
+  jackson:
+    deserialization:
+      fail-on-numbers-for-enums: true   # benefitCategory must be the enum name, never an ordinal
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/carent_claims}
+    username: ${SPRING_DATASOURCE_USERNAME:carent}
+    # No default on purpose: export SPRING_DATASOURCE_PASSWORD before starting (see README).
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate   # schema is owned by Flyway only
+  flyway:
+    enabled: true
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        max.block.ms: 3000          # a down broker must not hang claim submission
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

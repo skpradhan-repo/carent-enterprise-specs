@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: CareSync Enterprise Claims API
+  description: |
+    Contract-first REST API for medical claim submission and retrieval.
+    Monetary values are strings with pattern to preserve BigDecimal precision.
+  version: 1.0.0
+  contact:
+    name: CareSync Platform Team
+
+servers:
+  - url: http://localhost:8082/api/v1
+    description: Claims service direct
+  - url: http://localhost:8080/api/v1
+    description: Via API Gateway
+
+tags:
+  - name: Claims
+    description: Claim submission and query
+
+paths:
+  /claims:
+    post:
+      tags: [Claims]
+      summary: Submit a new medical claim
+      operationId: submitClaim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimSubmissionRequest'
+            examples:
+              primaryCare:
+                summary: In-network primary care
+                value:
+                  memberId: "MEM-99201"
+                  providerId: "PRV-44102"
+                  serviceDate: "2026-10-25"
+                  billedAmount: "150.00"
+                  benefitCategory: "IN_NETWORK_PRIMARY_CARE"
+              preventive:
+                value:
+                  memberId: "MEM-99201"
+                  providerId: "PRV-10001"
+                  serviceDate: "2026-10-20"
+                  billedAmount: "200.00"
+                  benefitCategory: "PREVENTIVE_SCREENING"
+      responses:
+        '201':
+          description: Claim created and adjudicated (or pending review)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '400':
+          $ref: '#/components/responses/ProblemDetails'
+
+  /claims/{claimReference}:
+    get:
+      tags: [Claims]
+      summary: Get claim by business reference
+      operationId: getClaimByReference
+      parameters:
+        - name: claimReference
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^CLM-\d{8}-\d{6}$'
+            example: "CLM-20261031-891023"
+      responses:
+        '200':
+          description: Claim found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClaimResponse'
+        '404':
+          $ref: '#/components/responses/ProblemDetails'
+
+components:
+  responses:
+    ProblemDetails:
+      description: RFC 7807 Problem Details
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetailsSchema'
+
+  schemas:
+    Money:
+      type: string
+      pattern: '^\d+(\.\d{1,2})?$'
+      example: "150.00"
+      description: Decimal string, scale up to 2
+
+    BenefitCategory:
+      type: string
+      enum:
+        - IN_NETWORK_PRIMARY_CARE
+        - OUT_OF_NETWORK_SPECIALIST
+        - PREVENTIVE_SCREENING
+        - EXCLUDED_COSMETIC
+        - GENERAL_MEDICAL
+
+    ClaimStatus:
+      type: string
+      enum: [PENDING, UNDER_REVIEW, APPROVED, DENIED, REVERSED]
+
+    ClaimSubmissionRequest:
+      type: object
+      required: [memberId, providerId, serviceDate, billedAmount, benefitCategory]
+      properties:
+        memberId:
+          type: string
+          minLength: 5
+          example: "MEM-99201"
+        providerId:
+          type: string
+          minLength: 5
+          example: "PRV-44102"
+        serviceDate:
+          type: string
+          format: date
+          example: "2026-10-25"
+        billedAmount:
+          $ref: '#/components/schemas/Money'
+        benefitCategory:
+          $ref: '#/components/schemas/BenefitCategory'
+
+    ClaimResponse:
+      type: object
+      required:
+        - claimReference
+        - memberId
+        - providerId
+        - serviceDate
+        - billedAmount
+        - benefitCategory
+        - status
+      properties:
+        claimReference:
+          type: string
+          example: "CLM-20261031-891023"
+        memberId:
+          type: string
+        providerId:
+          type: string
+        serviceDate:
+          type: string
+          format: date
+        billedAmount:
+          $ref: '#/components/schemas/Money'
+        benefitCategory:
+          $ref: '#/components/schemas/BenefitCategory'
+        adjudicatedAmount:
+          $ref: '#/components/schemas/Money'
+        patientCoPay:
+          $ref: '#/components/schemas/Money'
+        status:
+          $ref: '#/components/schemas/ClaimStatus'
+        denialReason:
+          type: string
+          nullable: true
+          example: null
+
+    ProblemDetailsSchema:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "about:blank"
+        title:
+          type: string
+          example: "Validation Failed"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "billedAmount must be greater than or equal to 5.00"
+        instance:
+          type: string
+          example: "/api/v1/claims"
