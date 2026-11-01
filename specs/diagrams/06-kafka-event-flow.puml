@@ -1,0 +1,23 @@
+@startuml 06-kafka-event-flow
+title Kafka event flow - topic claim-lifecycle-events
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+left to right direction
+
+component "care-claims-service\nClaimEventPublisher port\nKafkaClaimEventPublisher adapter" as prod
+queue "claim-lifecycle-events\n3 partitions\nkey = claimReference\nvalue = JSON envelope" as topic
+component "care-notification-service\nClaimEventListener\ngroup care-notification-group" as cons
+file "Audit log line\n[AUDIT NOTIFICATION] ..." as log
+
+prod --> topic : CLAIM_SUBMITTED\n(always)
+prod --> topic : CLAIM_ADJUDICATED\n(only if APPROVED or DENIED)
+prod ..> topic : CLAIM_REVERSED\n(contract defined, not produced yet)
+topic --> cons : consume\nat-least-once
+cons --> log : APPROVED / DENIED -> payable amount\nREVERSED -> prior payable amount
+
+note bottom of topic
+  Envelope: eventId (uuid), eventType, timestamp, payload.
+  Money fields are strings to keep scale-2 precision.
+  UNDER_REVIEW claims emit CLAIM_SUBMITTED only.
+end note
+@enduml

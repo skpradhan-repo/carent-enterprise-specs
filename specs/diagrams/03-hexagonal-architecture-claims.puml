@@ -1,0 +1,90 @@
+@startuml 03-hexagonal-architecture-claims
+title care-claims-service - Hexagonal architecture (dependency rule: adapter -> application -> domain)
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam packageStyle rectangle
+skinparam classAttributeIconSize 0
+
+package "adapter.in.web" #FFF4E0 {
+  class ClaimController
+  class ClaimWebMapper
+  class GlobalExceptionHandler <<ControllerAdvice>>
+  class "ClaimSubmissionRequest / ClaimResponse" as Dto <<DTO>>
+}
+
+package "application.port.in" #E8F5E9 {
+  interface SubmitClaimUseCase
+  interface GetClaimUseCase
+  class SubmitClaimCommand <<record>>
+}
+
+package "application.service" #E8F5E9 {
+  class ClaimApplicationService
+}
+
+package "application.port.out" #E8F5E9 {
+  interface ClaimRepository
+  interface ClaimEventPublisher
+}
+
+package "domain (pure Java: no Spring, JPA or Kafka)" #E8F1FB {
+  class Claim <<Aggregate root>>
+  class AdjudicationEngine <<Domain service>>
+  class ClaimReferenceGenerator <<Domain service>>
+  class Money <<Value object>>
+  class ClaimReference <<record>>
+  enum ClaimStatus
+  enum BenefitCategory
+  enum DenialReason
+}
+
+package "adapter.out.persistence" #FFF4E0 {
+  class ClaimPersistenceAdapter
+  class ClaimMapper
+  class ClaimJpaEntity <<Entity>>
+  interface SpringDataClaimRepository
+}
+
+package "adapter.out.messaging" #FFF4E0 {
+  class KafkaClaimEventPublisher
+}
+
+package "config" #F3E5F5 {
+  class ClaimsBeanConfig
+  class KafkaTopicConfig
+}
+
+ClaimController --> SubmitClaimUseCase
+ClaimController --> GetClaimUseCase
+ClaimController ..> ClaimWebMapper
+ClaimController ..> Dto
+ClaimController ..> SubmitClaimCommand
+
+ClaimApplicationService ..|> SubmitClaimUseCase
+ClaimApplicationService ..|> GetClaimUseCase
+ClaimApplicationService --> ClaimRepository
+ClaimApplicationService --> ClaimEventPublisher
+ClaimApplicationService --> AdjudicationEngine
+ClaimApplicationService --> ClaimReferenceGenerator
+ClaimApplicationService ..> Claim
+
+ClaimPersistenceAdapter ..|> ClaimRepository
+ClaimPersistenceAdapter --> SpringDataClaimRepository
+ClaimPersistenceAdapter ..> ClaimMapper
+ClaimMapper ..> ClaimJpaEntity
+KafkaClaimEventPublisher ..|> ClaimEventPublisher
+
+AdjudicationEngine --> Claim
+Claim *-- ClaimReference
+Claim --> ClaimStatus
+Claim --> BenefitCategory
+Claim --> DenialReason
+Claim ..> Money
+
+ClaimsBeanConfig ..> ClaimApplicationService : wires beans
+ClaimsBeanConfig ..> AdjudicationEngine
+
+note bottom of "domain (pure Java: no Spring, JPA or Kafka)"
+  Enforced by HexagonalArchitectureTest (ArchUnit).
+end note
+@enduml

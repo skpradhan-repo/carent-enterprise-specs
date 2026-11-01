@@ -1,0 +1,42 @@
+@startuml 02-hld-microservices-topology
+title CareSync Enterprise - High-level design: microservices topology
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+
+package "Edge" {
+  component "care-gateway-service\n:8080\nSpring Cloud Gateway\nJWT validation, routing,\nGET retry, RFC 7807 errors" as gw
+}
+
+package "Services" {
+  component "care-auth-service\n:8081\nIssues HS256 JWT\n(ROLE_MEMBER, ROLE_CLAIMS_ADJUDICATOR,\nROLE_ADMIN)" as auth
+  component "care-claims-service\n:8082\nHexagonal core domain:\nvalidate, adjudicate,\npersist, publish" as claims
+  component "care-notification-service\n:8083\nKafka consumer,\naudit log lines" as notif
+}
+
+package "Infrastructure (infra/docker-compose.yml)" {
+  database "PostgreSQL 16\n:5432\ncarent_claims" as db
+  queue "Apache Kafka (KRaft)\n:9092\nclaim-lifecycle-events\n3 partitions, key = claimReference" as kafka
+  component "Kafka UI\n:8090" as kui
+}
+
+actor "Client" as client
+
+client --> gw : REST / HTTPS
+gw --> auth : REST  /api/v1/auth/**
+gw --> claims : REST  /api/v1/claims/**
+claims --> db : JDBC (Flyway-managed schema)
+claims --> kafka : produce\nCLAIM_SUBMITTED, CLAIM_ADJUDICATED
+kafka --> notif : consume
+kui ..> kafka : inspect
+
+note right of auth
+  The JWT secret (JWT_SECRET) is shared by auth (sign)
+  and gateway (verify). All services bind to 127.0.0.1.
+end note
+note bottom of kafka
+  CLAIM_REVERSED is consumed by notification
+  but not produced yet (no reversal API).
+end note
+@enduml

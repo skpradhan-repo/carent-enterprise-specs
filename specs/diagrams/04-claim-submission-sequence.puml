@@ -1,0 +1,61 @@
+@startuml 04-claim-submission-sequence
+title Claim submission - end to end (as implemented)
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+autonumber
+
+actor Client
+participant "Gateway\n:8080" as GW
+participant "Auth\n:8081" as AUTH
+participant "Claims\n:8082" as CL
+participant "AdjudicationEngine\n(domain)" as ENG
+database "PostgreSQL" as DB
+queue "Kafka\nclaim-lifecycle-events" as K
+participant "Notification\n:8083" as N
+
+== Obtain a token ==
+Client -> GW : POST /api/v1/auth/token {username, password}
+GW -> AUTH : forward (public route)
+AUTH --> GW : JWT (HS256, roles, expiresIn 3600)
+GW --> Client : 200 {accessToken, tokenType, expiresIn}
+
+== Submit a claim ==
+Client -> GW : POST /api/v1/claims\nAuthorization: Bearer <token>
+GW -> GW : validate JWT signature, expiry, issuer
+alt token missing or invalid
+  GW --> Client : 401 Problem Details
+else token valid
+  GW -> CL : forward request
+  CL -> CL : validate memberId, providerId,\nbilledAmount >= 5.00
+  alt validation fails
+    CL --> GW : 400 Validation Failed (RFC 7807)
+    GW --> Client : 400
+  else valid
+    CL -> DB : existsRecentDuplicate (24 h window)
+    CL -> ENG : adjudicate(claim, suspectedDuplicate)
+    ENG --> CL : APPROVED / DENIED / UNDER_REVIEW
+    CL -> DB : save claim
+    CL -> K : CLAIM_SUBMITTED
+    opt status is APPROVED or DENIED
+      CL -> K : CLAIM_ADJUDICATED
+    end
+    CL --> GW : 201 Created + ClaimResponse
+    GW --> Client : 201
+  end
+end
+
+== Asynchronous notification ==
+K -> N : consume (group care-notification-group)
+N -> N : log [AUDIT NOTIFICATION] line
+
+== Read back ==
+Client -> GW : GET /api/v1/claims/{claimReference}
+GW -> CL : forward (GET is retried on 502/503)
+CL -> DB : find by claimReference
+CL --> Client : 200 ClaimResponse (404 Claim Not Found if absent)
+
+note over CL, K
+  Events are published after the database commit and there is no outbox:
+  if Kafka is down the claim is stored and the event is lost.
+end note
+@enduml

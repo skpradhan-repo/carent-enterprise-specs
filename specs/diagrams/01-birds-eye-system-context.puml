@@ -1,0 +1,37 @@
+@startuml 01-birds-eye-system-context
+title CareSync Enterprise - System Context (C4 level 1)
+left to right direction
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam rectangle {
+  RoundCornerThreshold 8
+}
+
+actor "Member" as member
+actor "Claims adjudicator" as adj
+actor "Administrator" as admin
+
+rectangle "CareSync Enterprise platform" as platform #E8F1FB {
+  rectangle "Gateway\n:8080" as gw
+  rectangle "Auth\n:8081" as auth
+  rectangle "Claims\n:8082" as claims
+  rectangle "Notification\n:8083" as notif
+  database "PostgreSQL 16\ncarent_claims" as db
+  queue "Kafka\nclaim-lifecycle-events" as kafka
+}
+
+member --> gw : HTTPS / JWT (Bearer)
+adj --> gw : HTTPS / JWT (Bearer)
+admin --> gw : HTTPS / JWT (Bearer)
+
+gw --> auth : /api/v1/auth/**
+gw --> claims : /api/v1/claims/**
+claims --> db : JPA + Flyway
+claims --> kafka : CLAIM_SUBMITTED\nCLAIM_ADJUDICATED
+kafka --> notif : consume\n(group care-notification-group)
+
+legend bottom
+  Out of scope for MVP: FHIR / EDI 837 ingestion, real provider contracts,
+  full HIPAA audit logging and encryption at rest (specs/01 section 7).
+endlegend
+@enduml

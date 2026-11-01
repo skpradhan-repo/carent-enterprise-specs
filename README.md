@@ -2,6 +2,12 @@
 
 This folder is the **single source of truth** for building the CareSync healthcare claims platform with IBM Bob (or any AI coding assistant).
 
+## Architecture at a glance
+
+![CareSync system context](specs/diagrams/rendered/01-birds-eye-system-context.png)
+
+More views (topology, hexagonal layers, sequence, domain, state machine, Kafka events) are in [`specs/diagrams/`](specs/diagrams/README.md).
+
 ## Build and run
 
 ### Prerequisites
@@ -183,6 +189,7 @@ for POST /api/v1/claims and GET /api/v1/claims/{claimReference}.
 | `specs/06-testing-and-quality.md` | Test pyramid, ArchUnit, mutation, coverage expectations |
 | `specs/07-security-and-errors.md` | JWT roles, RFC 7807 catalogue, validation |
 | `specs/openapi.yaml` | Contract-first OpenAPI 3.0 |
+| `specs/diagrams/` | Architecture diagrams (PlantUML sources + rendered PNG/SVG): see [`specs/diagrams/README.md`](specs/diagrams/README.md) |
 | `infra/docker-compose.yml` | Local PostgreSQL + Kafka (KRaft) + Kafka UI |
 | `PROJECT_RULES.md` | Short rules file Bob / Claude should always load |
 

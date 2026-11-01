@@ -1,0 +1,94 @@
+@startuml 05-domain-model-and-state
+title Claims domain model and claim lifecycle
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+skinparam classAttributeIconSize 0
+skinparam state {
+  BackgroundColor #F7F8FA
+}
+
+package "Domain model" {
+  class AdjudicationEngine <<Domain service>> {
+    +adjudicate(claim, suspectedDuplicate) : AdjudicationResult
+  }
+
+  class Claim <<Aggregate root>> {
+    -id : Long
+    -claimReference : ClaimReference
+    -memberId : String
+    -providerId : String
+    -serviceDate : LocalDate
+    -billedAmount : BigDecimal
+    -benefitCategory : BenefitCategory
+    -status : ClaimStatus
+    -adjudicatedAmount : BigDecimal
+    -patientCoPay : BigDecimal
+    -denialReason : DenialReason
+    -createdAt : Instant
+    -updatedAt : Instant
+    +{static} submit(...) : Claim
+    +applyAdjudication(result, clock)
+    +reverse(clock) : BigDecimal
+  }
+
+  class AdjudicationResult <<record>> {
+    status, adjudicatedAmount,
+    patientCoPay, denialReason
+  }
+
+  enum ClaimStatus {
+    PENDING
+    UNDER_REVIEW
+    APPROVED
+    DENIED
+    REVERSED
+  }
+
+  enum BenefitCategory {
+    IN_NETWORK_PRIMARY_CARE  (0.80)
+    OUT_OF_NETWORK_SPECIALIST  (0.50)
+    PREVENTIVE_SCREENING  (1.00)
+    EXCLUDED_COSMETIC  (0.00)
+    GENERAL_MEDICAL  (0.70)
+  }
+
+  enum DenialReason {
+    TIMELY_FILING_EXCEEDED
+    EXCLUDED_SERVICE
+  }
+
+  AdjudicationEngine --> Claim : decides and applies
+  AdjudicationEngine ..> AdjudicationResult
+  Claim --> ClaimStatus
+  Claim --> BenefitCategory
+  Claim --> DenialReason
+}
+
+note bottom of Claim
+  Invariant: adjudicatedAmount + patientCoPay == billedAmount.
+  Money is BigDecimal, scale 2, HALF_EVEN.
+  Rule precedence: timely filing > excluded service > duplicate > coverage rate.
+end note
+
+@enduml
+
+@startuml 05b-claim-state-machine
+title Claim lifecycle (state machine)
+skinparam shadowing false
+skinparam defaultFontName Helvetica
+
+[*] --> PENDING : submit (validated)
+PENDING --> APPROVED : covered, not a duplicate
+PENDING --> DENIED : service date older than 365 days\n(TIMELY_FILING_EXCEEDED)\nor excluded category (EXCLUDED_SERVICE)
+PENDING --> UNDER_REVIEW : suspected duplicate\n(24 h window)
+UNDER_REVIEW --> APPROVED : re-adjudicated (allowed by the domain)
+UNDER_REVIEW --> DENIED : re-adjudicated (allowed by the domain)
+APPROVED --> REVERSED : reverse()\n(domain only, no API yet)
+DENIED --> [*]
+REVERSED --> [*]
+
+note right of REVERSED
+  No transition back to APPROVED
+  without submitting a new claim.
+end note
+@enduml
